@@ -7,7 +7,9 @@ social cards, and print.
 
 Here's an example:
 
-<video src="https://raw.githubusercontent.com/ivy-invest/claude-design-for-ads/main/examples/explainer-video/explainer-rendered.mp4" poster="https://raw.githubusercontent.com/ivy-invest/claude-design-for-ads/main/assets/preview.png" autoplay loop muted controls playsinline width="540"></video>
+https://github.com/user-attachments/assets/ae9b17e6-955e-4e55-8a7e-1e56d595bc87
+
+(If the above preview doesn't load for you, click here to [view](https://raw.githubusercontent.com/ivy-invest/claude-design-for-ads/main/examples/explainer-video/explainer-rendered.mp4).)
 
 This toolkit gives you everything to do that reliably:
 

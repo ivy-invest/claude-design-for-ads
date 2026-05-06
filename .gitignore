@@ -5,7 +5,7 @@ package-lock.json
 *.mov
 *.avi
 *.mkv
-!assets/preview.mp4
+!examples/explainer-video/explainer-rendered.mp4
 .DS_Store
 .env
 .env.local

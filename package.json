@@ -1,0 +1,33 @@
+{
+  "name": "claude-design-for-ads",
+  "version": "0.1.0",
+  "description": "Render Claude Design animation exports into shippable video and image assets.",
+  "main": "local-scripts/capture.js",
+  "bin": {
+    "claude-design-render": "./local-scripts/capture.js"
+  },
+  "scripts": {
+    "render": "node local-scripts/capture.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ivy-invest/claude-design-for-ads.git"
+  },
+  "keywords": [
+    "claude",
+    "animation",
+    "video",
+    "puppeteer",
+    "ffmpeg",
+    "ads",
+    "motion-graphics"
+  ],
+  "author": "Matt Pauker",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0"
+  }
+}

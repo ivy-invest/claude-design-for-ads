@@ -55,7 +55,7 @@ This will:
   5. Render the example animation as a verification step
   6. Open the rendered video when finished
 
-First run takes 5-10 minutes (mostly the Homebrew install).
+First run takes a few minutes (mostly the Homebrew install).
 
 ================================================================
 
@@ -115,7 +115,7 @@ npm install
 
 # 5. Render the example
 echo ""
-echo "→ Rendering example.mp4 as a verification step (~5 minutes)..."
+echo "→ Rendering example.mp4 as a verification step (~30 seconds)..."
 node local-scripts/capture.js \
   --input=examples/hello-world.html \
   --output=example.mp4
@@ -134,14 +134,11 @@ cat <<DONE
 
   To render your own animations later:
   - Open that folder in Finder, double-click render.command, then
-    drag your animation HTML or paste a Claude Design preview URL
+    paste a Claude Design preview URL (or drag in an HTML file)
     into the Terminal window and press Enter.
   - Or from Terminal:
-      $INSTALL_DIR/render.command path/to/animation.html
       $INSTALL_DIR/render.command "https://...claudeusercontent.com/..."
-
-  Both flows are local — nothing gets installed in your Claude
-  Design Design System.
+      $INSTALL_DIR/render.command path/to/animation.html
 
 ================================================================
 

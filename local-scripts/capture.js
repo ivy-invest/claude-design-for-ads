@@ -1,25 +1,37 @@
 #!/usr/bin/env node
 /*
- * Deterministic capture of an HTML animation to MP4.
+ * Capture a Claude Design HTML page (animation or static design) to MP4 or PNG.
  *
- * Designed for Claude Design exports that expose window.__capture and
- * support a ?embed=1 bare-render mode (no player chrome). Loads the page,
- * pauses, then seeks the playhead frame-by-frame via window.__capture.seek
- * and screenshots each frame. Output is identical run-to-run, faster than
- * real-time, no clipping or rate-matching needed.
+ * Auto-detects animation vs static at load time:
+ *   - If the page exposes window.__capture (animation built against the
+ *     toolkit's Stage runtime, or auto-substituted via interception for
+ *     a Claude Design preview URL), captures frame-by-frame via
+ *     seek + screenshot, encodes to MP4 with ffmpeg.
+ *   - Otherwise treats it as a static design: walks the DOM to find
+ *     the design's wrapper element via a structural heuristic, then
+ *     screenshots that element at 2× DPR to produce a PNG.
  *
- * Requires the export to expose:
- *   - window.__capture.seek(t), .pause(), .duration
- *   - ?embed=1 query param that hides player chrome
+ * Output extension is normalized — pass --output=foo.mp4 or just
+ * --output=foo and the file lands as foo.mp4 (animation) or foo.png
+ * (static design) regardless of what was passed.
  *
- * See ../ad-toolkit/video-export-contract.md for the full contract.
+ * --input accepts a local HTML file path or an http(s) URL. URLs are
+ * useful for Claude Design preview links — for animation URLs,
+ * capture.js intercepts the default Stage runtime ('animations.jsx')
+ * and substitutes the toolkit's contract-compliant video-stage.jsx in
+ * flight, so the page exposes window.__capture even if the source
+ * didn't use the toolkit. Other relative .jsx scripts on the same
+ * origin are re-fetched with the original URL's auth token and served
+ * via interception too, sidestepping CDN auth issues.
+ *
+ * See ../reference/animation-design-principles.md for design guidance.
  *
  * Usage:
- *   node capture.js --input=<file.html> --output=<out.mp4> \
+ *   node capture.js --input=<file.html|url> --output=<out> \
  *     [--duration=<s>] [--fps=60] [--width=1080] [--height=1080] \
  *     [--scale=2] [--crf=18]
  *
- *   --duration  override; otherwise read from window.__capture.duration
+ *   --duration  animation only; otherwise read from window.__capture.duration
  *   --scale     deviceScaleFactor; 2 supersamples for crisper text
  *
  * Requires puppeteer (npm i) and ffmpeg on PATH.
@@ -52,7 +64,8 @@ async function main() {
     process.exit(1);
   }
 
-  const input = path.resolve(args.input);
+  const isUrl = /^https?:\/\//i.test(args.input);
+  const input = isUrl ? args.input : path.resolve(args.input);
   const output = path.resolve(args.output);
   const fps = parseFloat(args.fps) || 60;
   const explicitWidth = args.width ? parseInt(args.width, 10) : null;
@@ -61,13 +74,16 @@ async function main() {
   const crf = parseInt(args.crf, 10) || 18;
   const explicitDuration = args.duration ? parseFloat(args.duration) : null;
 
-  // Initial viewport guess. Final viewport is reset after we read the
-  // Stage's actual width/height from window.__capture (unless --width
-  // and --height are both passed, which override auto-detect).
-  const initialWidth = explicitWidth || 1080;
+  // Initial viewport guess. Wide enough to give static designs (posters,
+  // ads, etc.) room to render at their intended dimensions without
+  // triggering responsive collapse from CSS media queries. Animation
+  // flow resizes after reading window.__capture.width/height; static
+  // image flow resizes if the design's measured width still exceeds
+  // this default. --width / --height override.
+  const initialWidth = explicitWidth || 1920;
   const initialHeight = explicitHeight || 1080;
 
-  if (!fs.existsSync(input)) {
+  if (!isUrl && !fs.existsSync(input)) {
     console.error('input not found: ' + input);
     process.exit(1);
   }
@@ -90,13 +106,192 @@ async function main() {
       if (t === 'error' || t === 'warning') console.error(`[page:${t}]`, msg.text());
     });
 
-    const url = pathToFileURL(input).href + '?embed=1';
+    let url;
+    if (isUrl) {
+      // For Claude Design preview URLs (and any other remote animation URL),
+      // intercept the default Stage runtime request and substitute our
+      // contract-compliant video-stage.jsx so window.__capture, embed mode,
+      // and clean loop-stop are guaranteed regardless of the source's
+      // original runtime. Re-fetch other relative .jsx scripts with the
+      // page's auth token so CDN auth doesn't 401 them.
+      const runtimePath = path.join(__dirname, 'video-stage.jsx');
+      const runtimeContent = fs.readFileSync(runtimePath, 'utf8');
+      const inputUrl = new URL(input);
+      const token = inputUrl.searchParams.get('t');
+
+      await page.setRequestInterception(true);
+      page.on('request', async (req) => {
+        const reqUrl = req.url();
+        // Substitute the default Stage runtime with ours.
+        if (/\/animations\.jsx(\?|$)/.test(reqUrl)) {
+          console.error(`[capture] substituting video-stage.jsx for ${reqUrl}`);
+          await req.respond({
+            status: 200,
+            contentType: 'application/javascript',
+            body: runtimeContent,
+          });
+          return;
+        }
+        // Stub favicon.ico — browsers auto-request it when there's no
+        // <link rel="icon"> in the HTML, and Claude Design's CDN
+        // doesn't have one, which logs a noisy 404 in the console.
+        if (/\/favicon\.ico(\?|$)/.test(reqUrl)) {
+          await req.respond({
+            status: 200,
+            contentType: 'image/x-icon',
+            body: '',
+          });
+          return;
+        }
+        // Re-fetch other same-origin relative .jsx scripts with the auth
+        // token, so CDN-served files don't 401 when the relative request
+        // omitted the token.
+        if (
+          token &&
+          reqUrl.startsWith(inputUrl.origin) &&
+          /\.jsx(\?|$)/.test(reqUrl) &&
+          !/[?&]t=/.test(reqUrl)
+        ) {
+          try {
+            const sep = reqUrl.includes('?') ? '&' : '?';
+            const tokenized = reqUrl + sep + 't=' + token;
+            const fetched = await fetch(tokenized);
+            const body = await fetched.text();
+            await req.respond({
+              status: fetched.status,
+              contentType: 'application/javascript',
+              body,
+            });
+          } catch (e) {
+            console.error(`[capture] token-fetch failed for ${reqUrl}: ${e.message}`);
+            await req.continue();
+          }
+          return;
+        }
+        await req.continue();
+      });
+
+      const sep = input.includes('?') ? '&' : '?';
+      url = input + sep + 'embed=1';
+    } else {
+      url = pathToFileURL(input).href + '?embed=1';
+    }
+
     await page.goto(url, { waitUntil: 'load', timeout: 60000 });
 
-    await page.waitForFunction(
-      () => window.__capture && typeof window.__capture.seek === 'function',
-      { timeout: 15000 },
-    );
+    // Auto-detect: animation pages expose window.__capture via the Stage
+    // runtime; static design pages don't. Wait briefly to give the runtime
+    // time to set it, then dispatch.
+    const isAnimation = await page
+      .waitForFunction(
+        () => window.__capture && typeof window.__capture.seek === 'function',
+        { timeout: 5000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+
+    if (!isAnimation) {
+      // ──────────────────────────────────────────────────────────────────
+      // Static image flow: find the design element, screenshot at 2× DPR.
+      // ──────────────────────────────────────────────────────────────────
+      console.error('[capture] no window.__capture detected — capturing as static PNG');
+
+      // Output extension swap: if user passed .mp4 (or no extension),
+      // produce .png. Animations would have produced .mp4 here.
+      const pngOutput = output.replace(/\.(mp4|png|jpg|jpeg)$/i, '') + '.png';
+
+      // Structural heuristic: walk body's children, take the largest
+      // non-structural one. If it fills body (95%+ width/height) it's
+      // another wrapper, so drill into ITS largest child. Stop when
+      // the candidate is smaller than body — that's the design. Works
+      // regardless of wrapper tag/class. Sets data-cda-target on the
+      // chosen element so we can grab a fresh handle after reloads.
+      const findDesign = async () => {
+        return await page.evaluate(() => {
+          const STRUCTURAL = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK', 'META']);
+          const largestChild = (parent) => {
+            let best = null, bestArea = 0;
+            for (const c of parent.children) {
+              if (STRUCTURAL.has(c.tagName)) continue;
+              const r = c.getBoundingClientRect();
+              const area = r.width * r.height;
+              if (area > bestArea) { best = c; bestArea = area; }
+            }
+            return best;
+          };
+          const bodyRect = document.body.getBoundingClientRect();
+          let el = largestChild(document.body);
+          if (!el) return null;
+          for (let i = 0; i < 5; i++) {
+            const r = el.getBoundingClientRect();
+            const fillsBody = r.width >= bodyRect.width * 0.95 && r.height >= bodyRect.height * 0.95;
+            if (!fillsBody) break;
+            const inner = largestChild(el);
+            if (!inner || inner === el) break;
+            el = inner;
+          }
+          el.setAttribute('data-cda-target', '');
+          const r = el.getBoundingClientRect();
+          return {
+            tagName: el.tagName.toLowerCase(),
+            className: el.className,
+            width: Math.round(r.width),
+            height: Math.round(r.height),
+          };
+        });
+      };
+
+      let description = await findDesign();
+      if (!description) throw new Error('Could not locate a design element on the page');
+
+      // Only resize the viewport if the design actually exceeds it (e.g.
+      // a 4K design in our 1920 default viewport) or if the user passed
+      // explicit --width / --height. Resizing to the design's measured
+      // dimensions when it already fits would shrink the design (body
+      // padding/margin around the design consumes some of the new
+      // viewport's width on reload).
+      const currentViewport = page.viewport();
+      const needsResize =
+        description.width > currentViewport.width ||
+        (explicitWidth && explicitWidth !== currentViewport.width) ||
+        (explicitHeight && explicitHeight !== currentViewport.height);
+      if (needsResize) {
+        const targetW = explicitWidth || Math.max(description.width, currentViewport.width);
+        const targetH = explicitHeight || Math.max(description.height, currentViewport.height);
+        console.error(`[capture] resizing viewport to fit design: ${targetW}x${targetH}`);
+        await page.setViewport({ width: targetW, height: targetH, deviceScaleFactor: scale });
+        await page.reload({ waitUntil: 'networkidle0', timeout: 60000 });
+        description = await findDesign();
+        if (!description) throw new Error('Lost the design element after viewport resize');
+      }
+
+      console.error(`[capture] design element: <${description.tagName}${description.className ? ' class="' + description.className + '"' : ''}>  ${description.width}x${description.height} → ${description.width * scale}x${description.height * scale} @ ${scale}x`);
+
+      // Neutralize body/html background so designs with transparent
+      // wrappers come out with proper alpha instead of inheriting the
+      // wrapper's background color. Designs with their own opaque
+      // background are unaffected (their bg covers the body anyway).
+      await page.evaluate(() => {
+        document.body.style.background = 'transparent';
+        document.documentElement.style.background = 'transparent';
+      });
+
+      // Wait for all CSS fonts to fully load + apply before capture.
+      // networkidle0 waits for the network, but Font Loading API can
+      // finish a beat after that — without this, glyphs may fall back
+      // to system fonts and show as tofu (missing-glyph boxes).
+      await page.evaluate(() => document.fonts.ready);
+
+      const handle = await page.$('[data-cda-target]');
+      // omitBackground gives us PNG transparency where the body bg was visible.
+      await handle.screenshot({ path: pngOutput, type: 'png', omitBackground: true });
+      console.error('[capture] done → ' + pngOutput);
+      return;
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Animation flow: existing frame-by-frame seek-and-screenshot loop.
+    // ──────────────────────────────────────────────────────────────────
 
     // Auto-detect Stage dimensions if --width / --height weren't both passed.
     // Falls back to initialWidth/Height if the Stage didn't expose them.
@@ -124,9 +319,19 @@ async function main() {
 
     const duration = explicitDuration ?? await page.evaluate(() => window.__capture.duration);
     const totalFrames = Math.round(fps * duration);
+    // Empirical headless capture rate on a recent Mac: ~8 frames/sec
+    // (screenshot + double-rAF wait + pipe to ffmpeg). Add ~30s for
+    // browser launch + final encode flush. Used purely for ETA display.
+    const estSec = Math.ceil(totalFrames / 8) + 30;
+    const estMin = Math.max(1, Math.round(estSec / 60));
     console.error(
-      `[capture] ${duration}s @ ${fps}fps  ${width}x${height}@${scale}x  ${totalFrames} frames`,
+      `[capture] ${duration}s @ ${fps}fps  ${width}x${height}@${scale}x  ${totalFrames} frames  (eta ~${estMin} min)`,
     );
+
+    // Normalize output extension to .mp4 regardless of what was passed,
+    // so callers don't need to know in advance whether they're rendering
+    // animation or static.
+    const mp4Output = output.replace(/\.(mp4|png|jpg|jpeg)$/i, '') + '.mp4';
 
     const ff = spawn(
       'ffmpeg',
@@ -144,7 +349,7 @@ async function main() {
         '-crf', String(crf),
         '-pix_fmt', 'yuv420p',
         '-movflags', '+faststart',
-        output,
+        mp4Output,
       ],
       { stdio: ['pipe', 'inherit', 'inherit'] },
     );
@@ -182,7 +387,7 @@ async function main() {
 
     ff.stdin.end();
     await ffDone;
-    console.error('[capture] done → ' + output);
+    console.error('[capture] done → ' + mp4Output);
   } finally {
     await browser.close();
   }

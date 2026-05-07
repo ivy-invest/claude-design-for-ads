@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 #
-# claude-design-for-ads — render an animation HTML to MP4
+# claude-design-for-ads — render a Claude Design preview into MP4 or PNG
 #
 # Workflow:
 #   1. Double-click render.command in Finder (opens Terminal)
-#   2. Drag your animation HTML file into the Terminal window
+#   2. Drag an animation HTML / static design HTML into the Terminal
+#      window, or paste a Claude Design preview URL
 #   3. Press Enter
 #
-# Or run from Terminal with the file as an arg:
-#   ./render.command path/to/animation.html
+# capture.js auto-detects animation vs static design:
+#   - Animation (window.__capture exposed) → MP4
+#   - Static design (no capture API) → PNG at 2× DPR
+#
+# Claude Design preview URLs (https://...claudeusercontent.com/...)
+# work directly. For animation URLs, capture.js intercepts the default
+# Stage runtime and substitutes a contract-compliant video-stage.jsx
+# in flight, so no Design System install is required.
+#
+# Or run from Terminal with the file/URL as an arg:
+#   ./render.command path/to/design.html
+#   ./render.command "https://...claudeusercontent.com/.../My%20Design.html?t=..."
 #
 # Mac only. For Linux/Windows, run the capture script directly:
 #   node local-scripts/capture.js --input=... --output=...
@@ -60,42 +71,92 @@ if [ -z "$INPUT" ]; then
 ================================================================
   claude-design-for-ads — render
 
-  Drag your animation HTML file into this Terminal window
-  (the file path will appear), then press Enter:
+  Paste a Claude Design preview URL into this Terminal window, OR
+  drag in a Claude Design HTML file (animation or static design).
+  Then press Enter. Animations render to MP4; static designs render
+  to PNG at 2× DPR.
 ================================================================
 
 PROMPT
   read -r DROPPED
-  # When you drag a file from Finder into Terminal, spaces in the
-  # path are backslash-escaped. eval interprets those escapes so
-  # the path resolves correctly.
-  eval "INPUT=$DROPPED"
+  # URLs are taken literally; file paths from Finder drags use
+  # backslash escapes that eval needs to interpret.
+  if [[ "$DROPPED" =~ ^https?:// ]]; then
+    INPUT="$DROPPED"
+  else
+    eval "INPUT=$DROPPED"
+  fi
 fi
 
-if [ ! -f "$INPUT" ]; then
+# Detect URL vs file path so we know how to derive the output path
+# and whether to validate file existence.
+if [[ "$INPUT" =~ ^https?:// ]]; then
+  IS_URL=1
+else
+  IS_URL=0
+  if [ ! -f "$INPUT" ]; then
+    echo ""
+    echo "File not found: $INPUT"
+    echo ""
+    echo "Press any key to close..."
+    read -n 1
+    exit 1
+  fi
+fi
+
+# Output basename (no extension). capture.js auto-detects whether the
+# input is an animation or a static design and produces .mp4 or .png
+# accordingly.
+if [ "$IS_URL" -eq 1 ]; then
+  # e.g. .../How%20Gravity%20Works.html?t=... → "How Gravity Works"
+  RAW="${INPUT##*/}"             # last path segment + query
+  RAW="${RAW%%\?*}"              # strip query string
+  RAW="${RAW%.*}"                # strip extension
+  DECODED="${RAW//%20/ }"        # URL-decode %20 → space
+  BASE="$PWD/${DECODED}"
+else
+  BASE="${INPUT%.*}"
+fi
+
+# Avoid clobbering an existing render: if either <BASE>.mp4 or
+# <BASE>.png is already taken, append -2, -3, ... until both
+# candidate names are free.
+if [ -f "${BASE}.mp4" ] || [ -f "${BASE}.png" ]; then
+  i=2
+  while [ -f "${BASE}-${i}.mp4" ] || [ -f "${BASE}-${i}.png" ]; do
+    i=$((i + 1))
+  done
+  BASE="${BASE}-${i}"
   echo ""
-  echo "File not found: $INPUT"
+  echo "Note: a render with that name already exists."
+  echo "Saving this one as ${BASE##*/}.mp4 or ${BASE##*/}.png instead."
+fi
+
+cat <<HEADER
+
+================================================================
+  Rendering: ${INPUT}
+  Output:    ${BASE}.mp4 (animation) or ${BASE}.png (static design)
+================================================================
+
+HEADER
+
+# Pass the .mp4 path; capture.js swaps to .png if it detects a static design.
+node local-scripts/capture.js --input="$INPUT" --output="${BASE}.mp4"
+
+# Open whichever file actually got produced.
+if [ -f "${BASE}.mp4" ]; then
+  OUTPUT="${BASE}.mp4"
+elif [ -f "${BASE}.png" ]; then
+  OUTPUT="${BASE}.png"
+else
+  echo ""
+  echo "Render did not produce an output file. Check the logs above."
   echo ""
   echo "Press any key to close..."
   read -n 1
   exit 1
 fi
-
-# Output: same directory as input, same basename, .mp4 extension.
-OUTPUT="${INPUT%.*}.mp4"
-
-cat <<HEADER
-
-================================================================
-  Rendering: $(basename "$INPUT")
-  Output:    $(basename "$OUTPUT")
-================================================================
-
-This takes ~5 minutes for a 50-second 1080×1080 animation.
-
-HEADER
-
-node local-scripts/capture.js --input="$INPUT" --output="$OUTPUT"
 
 echo ""
 echo "→ Done. Opening $(basename "$OUTPUT")..."

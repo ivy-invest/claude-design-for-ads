@@ -98,9 +98,3 @@ What holds on screen at t=duration, and for how long. e.g. "Logo + CTA holds for
 
 Delivery format:
 MP4 (H.264), ProRes, WebM, source HTML for further editing, etc.
-
----
-
-## Worked example
-
-For a fully filled-in version of this template plus the resulting animation, see `explainer-video/`.

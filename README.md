@@ -9,71 +9,37 @@ Here's an example:
 
 https://github.com/user-attachments/assets/ae9b17e6-955e-4e55-8a7e-1e56d595bc87
 
-(If the above preview doesn't load for you, click here to [view](https://raw.githubusercontent.com/ivy-invest/claude-design-for-ads/main/examples/explainer-video/explainer-rendered.mp4).)
+(If the above preview doesn't load for you, click here to [view](https://static-assets.ivyinvest.co/claude-design-for-ads/example.mp4).)
 
-This toolkit gives you everything to do that reliably:
+The flow:
 
-- A small ruleset Claude Design follows when making animations and
-  high-res images, so the output is always shippable.
-- A simple script that turns a Claude Design animation into a finished
-  MP4.
-- A worked example you can render in five minutes to see how it all
-  fits together.
+1. Make an animation or static design in Claude Design.
+2. Click **Present** → **New tab** to open the preview, copy that
+   tab's URL.
+3. Paste the URL into the toolkit's local render script. Animations
+   come back as MP4, static designs as high-resolution PNG.
 
-**Two flows, and you only need the parts you'll use.** Both start
-with installing the toolkit into your Design System. For static
-images, that's the whole setup — Claude Design produces the PNGs
-in-Project. For animated videos, you also set up a local render
-script that turns the HTML Claude Design produces into a finished
-MP4.
+**Why this instead of screen-recording the animation or just asking
+Claude Design to export an image?**
 
----
-
-## A few terms you'll see
-
-The toolkit plugs into how Claude Design is structured. Three terms
-to know:
-
-**Design System.** In Claude Design, your **Design System** is an
-organization-level UI kit — colors, typography, components, layout
-patterns, plus any standing instructions and reference files you've
-uploaded. Per [Anthropic's docs](https://support.claude.com/en/articles/14604397-set-up-your-design-system-in-claude-design),
-it's "the foundation for every project created within your account."
-You set it up once at the org level (Design Systems live in
-organization settings); every Project your org creates from then on
-inherits from it automatically. **This is where the toolkit goes** —
-add it to the Design System once and every future ad/animation/image
-project picks it up by default.
-
-**Project.** An individual workspace inside Claude Design where one
-piece of work happens (one ad campaign, one explainer video, one
-landing page mock). Projects reference the org's Design System
-automatically — you don't wire them up per-project. So when this
-toolkit is in your Design System, opening any new Project to make an
-ad means the contract and runtime are already loaded.
-
-**`CLAUDE.md`.** A standing-instructions file inside the Design
-System. Whatever's in it gets loaded into every Project's
-conversations automatically. The toolkit ships a small `CLAUDE.md`
-snippet (at the top level of the toolkit) that you paste into your
-Design System's own `CLAUDE.md` so Claude Design discovers the contract
-and recipe when relevant.
-
-The practical takeaway: **install once at the Design System level,
-benefit forever across Projects.** No per-project setup.
+- **For animations**, deterministic frame-by-frame capture rather
+  than real-time recording. No dropped frames, no jittery timing,
+  no cutting into the next loop iteration. The script substitutes
+  a contract-compliant Stage runtime in flight so it can pause and
+  seek the playhead to any time `t` and screenshot the exact frame
+  — output is identical run-to-run.
+- **For static designs**, native 2× DPR capture at any size. When
+  you ask Claude Design itself to export an image, it caps native
+  capture at ~2576px and falls back to a soft 1×-upscaled image for
+  anything larger, which produces visibly fuzzy text and vectors at
+  print resolutions. This script captures the design's wrapper
+  element at 2× DPR directly, with no cap.
 
 ---
 
 ## Installation
 
-Pick **one** of the three paths below — don't run more than one.
-
-For Mac users, the one-line installer is the simplest path and covers
-both flows. If you only need static images and don't want Node/ffmpeg
-on your machine, the lightweight option is just to download the ZIP.
-On Linux/Windows, follow the manual instructions.
-
-### Mac one-line installer (recommended, for video + images)
+### Mac one-line installer (recommended)
 
 Open the Terminal app (⌘+Space, type **Terminal**, press Enter).
 Paste the line below and press Enter:
@@ -84,26 +50,18 @@ Paste the line below and press Enter:
 
 The script installs Homebrew (if you don't have it — asks for your
 Mac password), Node.js, and ffmpeg via Homebrew, asks you where to
-put the toolkit (defaults to `~/claude-design-for-ads`), installs the
-render script's dependencies, and renders the example animation as a
-verification step. First run takes 5–10 minutes (mostly the Homebrew
-install).
+put the toolkit (defaults to `~/claude-design-for-ads`), installs
+the render script's dependencies, and renders a tiny smoke test as
+a verification step. First run takes 5–10 minutes (mostly the
+Homebrew install).
 
-When the example MP4 opens automatically, the setup worked — continue
-to [Add to your Design System](#add-to-your-design-system).
+When the verification render opens automatically, the setup worked —
+continue to [Using the toolkit](#using-the-toolkit).
 
-### Image-only quick path (no install required)
+### Linux, Windows, or DIY on Mac
 
-If you only need static images, just download
-[the ZIP](https://github.com/ivy-invest/claude-design-for-ads/archive/refs/heads/main.zip)
-and unzip it (double-click on Mac). The image flow runs entirely
-inside Claude Design, so no other local setup is needed — skip ahead
-to [Add to your Design System](#add-to-your-design-system).
-
-### Manual install (Linux, Windows, or DIY on Mac)
-
-The Mac one-liner just runs the standard steps below. If you'd rather
-install each piece yourself, or you're not on a Mac:
+The Mac one-liner just runs the standard steps below. If you'd
+rather install each piece yourself, or you're not on a Mac:
 
 **Install Node.js and ffmpeg.** Mac: `brew install node ffmpeg`
 (install [Homebrew](https://brew.sh/) first if needed). Linux:
@@ -121,99 +79,68 @@ and unzip.
 **Install the render script's dependencies.** In Terminal, navigate
 into the toolkit folder and run `npm install`.
 
-**Render the example to verify:**
+**Render the smoke test to verify:**
 
 ```bash
 node local-scripts/capture.js \
-  --input=examples/explainer-video/explainer.html \
-  --output=example.mp4
+  --input=examples/hello-world.html \
+  --output=example
 ```
 
-If `example.mp4` plays cleanly, your setup works.
-
----
-
-## Add to your Design System
-
-**Prerequisite: you need a Design System already set up.** If your
-org doesn't have one yet, follow
-[Anthropic's setup guide](https://support.claude.com/en/articles/14604397-set-up-your-design-system-in-claude-design)
-to create one (uploads your brand assets, generates a UI kit). The
-toolkit is added to an *existing* Design System — don't try to drag
-the `ad-toolkit/` folder in during the initial Design System
-creation flow. Come back here once your Design System is created
-and you can see its **Design Files** tab.
-
-**You do this once at the Design System level**, and every Project
-your org spins up from then on can use the toolkit without further
-setup.
-
-**Drag the `ad-toolkit/` folder into your Design System.** Open your
-Design System, click the **Design Files** tab, and drag the entire
-`ad-toolkit/` folder from your computer into the **Drop Files Here**
-area. The 5 files inside attach to a chat with the design-system
-agent. Send the chat — `INSTALL.md` instructs the agent to:
-
-1. Create a folder called `ad-toolkit/` at the root of your Design
-   System and save the 5 files into it.
-2. Append the toolkit's snippet to this Design System's root
-   `CLAUDE.md` (creating the file if it doesn't exist), so Claude
-   Design discovers the toolkit during ad/animation/image work.
-
-The agent should confirm both steps in one short message when it's
-done. If it asks you where to put the files instead of just following
-`INSTALL.md`, reply: **"Follow `INSTALL.md`."**
-
-To verify the install, open Finder (or your file browser), navigate
-to the toolkit folder you unzipped earlier, go into the `examples`
-folder inside it, and double-click `hello-world.html`. It should open
-in your default browser and play a 5-second animation with playback
-controls. Then click into the browser's address bar, add `?embed=1`
-to the end of the URL, and hit Enter — the controls should disappear
-and the animation should fill the window. If both work, the toolkit
-is wired up correctly.
+If a short MP4 plays cleanly, your setup works.
 
 ---
 
 ## Using the toolkit
 
-Once it's installed at the Design System level, this is the day-to-day
-workflow.
+This is the day-to-day workflow once you've installed the toolkit.
+Animations and static designs both go through the same render
+pipeline — the script auto-detects which one you've handed it.
 
-### Making an animated video
+1. **Open a Project in Claude Design** and make whatever you want
+   to ship — an animation, a poster, an ad, a slide.
 
-1. **Open a Project in Claude Design.** Any new Project inherits your
-   Design System automatically, so the toolkit is already loaded — no
-   per-project setup.
+2. **Brief Claude Design.** For animations, describe the scenes, the
+   motion, the duration, where it'll deploy, and any brand or
+   compliance copy. For static designs, just describe what you want.
 
-2. **Brief Claude Design.** Describe the animation you want: the scenes,
-   the motion, the duration, where it'll deploy (TikTok, YouTube,
-   Reels, in-product, etc.), and any brand or compliance copy that has
-   to appear. See
-   [`examples/brief-template.md`](examples/brief-template.md) for the
-   briefing format and
-   [`examples/explainer-video/brief.md`](examples/explainer-video/brief.md)
-   for a worked example.
+   **Tip on animations:** if writing the brief from scratch feels
+   intimidating, drag
+   [`reference/brief-template.md`](reference/brief-template.md) into
+   a [Claude.ai](https://claude.ai/) chat, describe what you're
+   trying to make in plain language, and let Claude walk you through
+   filling in the blanks. Then paste the completed brief into
+   Claude Design.
 
-   **Tip:** if writing the brief from scratch feels intimidating, drag
-   `brief-template.md` into a [Claude.ai](https://claude.ai/) chat,
-   describe what you're trying to make in plain language, and let
-   Claude walk you through filling in the blanks. Then paste the
-   completed brief into Claude Design.
+3. **Get the design off Claude Design.** Two ways:
 
-3. **Claude Design produces a single self-contained HTML file** that
-   satisfies the export contract (loop turned off, embed mode, the
-   capture API). Download it by clicking **Share** in the upper right
-   of the Claude Design window and choosing **Export as standalone
-   HTML**.
+   - **Copy the preview URL.** In Claude Design, click **Present**
+     in the upper right and choose **New tab** from the dropdown —
+     the design opens in a fresh browser tab. Copy that tab's URL
+     (looks like
+     `https://...claudeusercontent.com/.../My Design.html?t=...`).
+     Fastest path. The token in the URL expires after a few hours,
+     so render reasonably soon after copying.
+   - **Or save as standalone HTML.** Click **Share** in the upper
+     right and choose **Export as standalone HTML**. Gives you a
+     self-contained file you can archive, share, or render later
+     without depending on a session token.
 
-4. **Render it to MP4.** On Mac, open the toolkit folder
+4. **Render it.** On Mac, open the toolkit folder
    (`~/claude-design-for-ads`) in Finder and double-click
-   `render.command`. A Terminal window opens and prompts you to drag
-   your HTML file in — drag it from Finder into the Terminal window
-   (the path appears), then press Enter. The MP4 lands next to your
-   HTML and opens automatically when done. Takes ~5 minutes for a 50s
-   1080×1080 animation.
+   `render.command`. A Terminal window opens and prompts you to
+   paste the URL or drag the HTML file in. Press Enter.
+
+   - For **animations**, the script substitutes a contract-compliant
+     Stage runtime in flight, captures every frame deterministically
+     via `seek(t)`, and pipes them through ffmpeg → MP4. ~5 minutes
+     for a 50s 1080×1080 animation.
+   - For **static designs**, the script finds the design's wrapper
+     element via a structural heuristic, waits for fonts to apply,
+     and screenshots the element at 2× DPR → PNG. Seconds.
+
+   The output lands next to your HTML (or in the toolkit folder for
+   URLs) and opens automatically when done.
 
    On Linux/Windows or if you want control over output settings (size,
    frame rate, etc.), run the capture script directly from Terminal:
@@ -221,69 +148,44 @@ workflow.
    ```bash
    cd ~/claude-design-for-ads
    node local-scripts/capture.js \
-     --input=~/Downloads/your-animation.html \
-     --output=~/Downloads/your-animation.mp4
+     --input=~/Downloads/your-design.html \
+     --output=~/Downloads/your-design
    ```
 
-   See [`local-scripts/README.md`](local-scripts/README.md) for size
-   variations (1080×1920 for TikTok/Reels, 4K, etc.) and
-   troubleshooting.
-
-### Making a high-resolution image (PNG)
-
-1. **Open a Project in Claude Design.** Same as above — your Design
-   System is already loaded.
-
-2. **Ask for a high-resolution PNG**, specifying the dimensions you
-   need (e.g. "1440×2560 for a vertical ad" or "1440×1440 for a feed
-   square"). Claude Design hands back a PNG at exactly those
-   dimensions.
-
-3. **Download the PNG.** No rendering step needed for static images.
+   See [`local-scripts/README.md`](local-scripts/README.md) for
+   size variations (9:16 vertical, 4K, etc.) and troubleshooting.
 
 ---
 
 ## Common questions
 
 **Do I have to use Claude Design?**
-The toolkit is built around Claude Design's Design System / `CLAUDE.md`
-mechanism, but the core ideas (the contract, the runtime, the recipe)
-work with any AI design tool that lets you load standing instructions.
-The render script works on any HTML that satisfies the contract,
-regardless of who or what produced it.
+The toolkit is built around Claude Design's preview URL conventions
+and the `<Stage>` API its default animation runtime exposes, but the
+core ideas — runtime substitution at capture time, element-targeted
+PNG capture at 2× DPR — work with any tool that produces standalone
+HTML in a similar shape. The render script works on any HTML that
+exposes a `window.__capture`-compatible API for animations, or any
+static design page for images.
 
-**Do I need Node.js, ffmpeg, or the render script for image work?**
-No. The image flow runs entirely inside Claude Design — none of
-those local tools are involved. Get the toolkit on your computer
-(the lightweight ZIP path is enough; you don't need the full Mac
-installer), drag the `ad-toolkit/` folder into your Design System,
-paste the `CLAUDE.md` snippet, and you're done. Ask Claude Design
-for a PNG at the dimensions you need and download it from the
-Project.
+**Do I need anything installed in my Claude Design Design System?**
+No. Earlier versions of this toolkit installed an image-export
+recipe in your Design System; that's no longer needed because
+`capture.js` produces high-DPR PNGs entirely locally. Nothing the
+toolkit ships gets installed into Claude Design.
 
 **How big can the output PNG be?**
-There's no cap from this toolkit. `gen_pptx` renders at 2× DPR
-internally and downscales via Lanczos-3 to whatever dimensions you
-asked for, so a request for 1440×2560 returns exactly 1440×2560. If
-you'd rather have the supersampled native render, ask Claude Design
-to "keep the native 2× render" — a 1440×2560 spec then yields a
-2880×5120 PNG.
+There's no cap from this toolkit. `capture.js` opens the design's
+preview at the design's native dimensions (or a sufficiently wide
+viewport) and screenshots the design's wrapper element at 2× DPR,
+so a 1440×2560 design comes out as a 2880×5120 PNG with crisp text
+and vectors.
 
-**What if my org doesn't have a Design System set up yet?**
-You'll need one before this toolkit is worth installing. Set up your
-Design System first (Anthropic's
-[setup guide](https://support.claude.com/en/articles/14604397-set-up-your-design-system-in-claude-design)
-walks through uploading brand assets and generating the UI kit), then
-add this toolkit on top. The toolkit expects a Design System as its
-host — without one, you'd have to drag the contract into every
-conversation by hand, which defeats the point.
-
-**Can I add this to a single Project instead of the Design System?**
-Technically yes — upload `ad-toolkit/` to a specific Project's files
-and paste the `CLAUDE.md` snippet into that Project's instructions.
-But you'd have to repeat that work for every new Project. Installing
-at the Design System level means every future Project inherits it for
-free, which is almost always what you want.
+By contrast, Claude Design's default `save_screenshot` caps native
+capture at ~2576px on the longest side, and above that falls back to
+upscaling the 1× capture — which produces soft text and vectors
+compared to a native 2× render. The local pipeline sidesteps that
+cap entirely, so high-DPR ad/print output stays crisp.
 
 **How long does a render take?**
 About 5–8 minutes for a 50-second 1080×1080 video on a recent Mac.
@@ -292,13 +194,15 @@ frames) and how complex the animation is. You can speed it up by
 dropping `--fps=30` (cuts to 1500 frames) or `--scale=1` (no
 2× supersampling — slightly softer text but ~3× faster).
 
-**The example renders fine but my own animation doesn't.**
-The animation HTML probably doesn't satisfy the contract — most often
-because `loop={true}` is still set on the `<Stage>` (so the animation
-wraps back to the start instead of stopping cleanly), or the
-`window.__capture` API isn't being exposed. See
-[`local-scripts/README.md`](local-scripts/README.md) under
-"Troubleshooting."
+**My animation came out as a PNG instead of an MP4.**
+capture.js auto-detects animation vs static design by waiting briefly
+for `window.__capture` to appear. For Claude Design preview URLs the
+script substitutes a contract-compliant Stage runtime in flight, so
+animations capture cleanly even if the source uses Claude Design's
+default Stage. If you're rendering a downloaded standalone HTML and
+it falls through to the static path, the export is probably missing
+the `<Stage>` component or its expected child structure — re-export
+from Claude Design and try again.
 
 **Can I render at a different size or aspect ratio?**
 Yes — `--width` and `--height` flags. For a 9:16 vertical (TikTok,
@@ -319,36 +223,32 @@ work.
 ## What's in the toolkit
 
 ```
-ad-toolkit/             ← drop this folder into your Design System
-  INSTALL.md            ← tells Claude Design how to install the toolkit
-  video-export-contract.md
-  animation-design-principles.md
-  video-stage.jsx
-  image-export-recipe.md
+local-scripts/          — local render pipeline
+  capture.js            ← URL or HTML → MP4 (animation) or PNG (static design)
+  video-stage.jsx       ← runtime substituted in-flight for animations
+  README.md
 
-CLAUDE.md               ← snippet to paste into your Design System's CLAUDE.md
+reference/              — design guides + brief template, read on GitHub or drag into briefs
+  brief-template.md
+  animation-design-principles.md
 
 install.sh              ← Mac one-line installer (run via curl-bash from Terminal)
-render.command          ← Mac convenience: double-click, drag your HTML in, press Enter
+render.command          ← Mac convenience: double-click, paste URL or drag HTML
 
-examples/               — open in a browser to verify install & study the contract
-  hello-world.html
-  brief-template.md
-  explainer-video/
-
-local-scripts/          — runs on your computer, turns animation HTML into MP4
-  capture.js
+examples/
+  hello-world.html      ← tiny smoke test; install.sh renders this to verify the pipeline
 ```
 
-Three top-level pieces, one job each:
+The pieces, by what they do:
 
-- **`ad-toolkit/`** is what goes in your Design System. Claude Design
-  reads from it when building animations or producing images.
-- **`CLAUDE.md`** is what tells Claude Design the toolkit exists. Paste
-  it into your Design System's own `CLAUDE.md`.
-- **`local-scripts/capture.js`** runs on your computer (not inside
-  Claude Design) and turns a contract-compliant animation HTML file
-  into an MP4.
+- **`local-scripts/`** is the toolkit's only moving part — capture.js
+  + video-stage.jsx + supporting README. capture.js takes a Claude
+  Design preview URL or a downloaded standalone HTML, auto-detects
+  whether it's an animation or a static design, and produces the
+  right output (MP4 or PNG).
+- **`reference/`** are design guides — read them on GitHub, or drag
+  them into a Claude.ai chat when drafting a brief. They aren't
+  installed anywhere; they shape *how you brief* a design.
 
 ---
 

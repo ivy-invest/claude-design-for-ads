@@ -117,7 +117,7 @@ npm install
 echo ""
 echo "→ Rendering example.mp4 as a verification step (~5 minutes)..."
 node local-scripts/capture.js \
-  --input=examples/explainer-video/explainer.html \
+  --input=examples/hello-world.html \
   --output=example.mp4
 
 # 6. Open it
@@ -133,14 +133,15 @@ cat <<DONE
   The toolkit lives at: $INSTALL_DIR
 
   To render your own animations later:
-  - Open that folder in Finder, double-click render.command,
-    drag your animation HTML into the Terminal window when
-    prompted, and press Enter.
+  - Open that folder in Finder, double-click render.command, then
+    drag your animation HTML or paste a Claude Design preview URL
+    into the Terminal window and press Enter.
   - Or from Terminal:
       $INSTALL_DIR/render.command path/to/animation.html
+      $INSTALL_DIR/render.command "https://...claudeusercontent.com/..."
 
-  Next: install the toolkit's ad-toolkit/ folder into your
-  Claude Design System. See the README on GitHub for steps.
+  Both flows are local — nothing gets installed in your Claude
+  Design Design System.
 
 ================================================================
 

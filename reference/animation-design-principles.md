@@ -1,6 +1,6 @@
 # Animation design principles
 
-Craft heuristics for video animation work, brand-agnostic. These are reflexive habits — each one is here because skipping it produced a worse result on real projects. Apply alongside the build requirements in `video-export-contract.md`.
+Craft heuristics for video animation work, brand-agnostic. These are reflexive habits — each one is here because skipping it produced a worse result on real projects.
 
 ---
 
@@ -31,6 +31,10 @@ When animating multiple elements that read as one continuous motion (pie wedges 
 A pie's 41% wedge should take ~5× longer to draw than its 8% wedge. Equal-duration reveals make small slices feel rushed and large ones sluggish — the eye reads it as bad timing even if it can't say why. Equal-velocity reveals read as one continuous sweep.
 
 Same for staggered text (longer words type proportionally longer), bar charts (taller bars grow longer), and any "drawing" animation.
+
+## Final frame must hold
+
+The closing composition (logo, CTA, headline — whatever lands the message) must be **fully visible at `t === duration`, with no exit fade**. Reach the final state by ~`duration - 3s` and hold. Without a held final frame, the rendered MP4's last frame catches the animation mid-transition or — for looped animations — cut into the start of the next loop, which looks broken on auto-played social previews.
 
 ## Beat-to-beat transitions: bridge or pause, never crossfade
 

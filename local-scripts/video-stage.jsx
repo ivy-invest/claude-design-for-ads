@@ -30,8 +30,9 @@
 //   window.__capture.width     // Stage width in px — lets capture.js auto-size viewport
 //   window.__capture.height    // Stage height in px
 //
-// Read ad-toolkit/video-export-contract.md for the full contract this file
-// is designed to satisfy.
+// Substituted in flight by capture.js when it loads a Claude Design
+// preview URL, replacing the source page's animations.jsx so
+// window.__capture is exposed for deterministic frame capture.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 

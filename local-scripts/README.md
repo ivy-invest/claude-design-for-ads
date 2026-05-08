@@ -156,6 +156,23 @@ real-time playback.
 
 ## Troubleshooting
 
+**"Cloudflare blocked the headless browser session" error.** The
+Claude Design URL you pasted is gated behind a Cloudflare bot-
+detection challenge that headless Chrome can't pass. Your real
+browser already cleared the challenge for that session, but
+Puppeteer's fresh session is treated as a bot. Workaround: in Claude
+Design, click **Share → Export as standalone HTML**, then drag
+*that* file into `render.command` instead of pasting the URL.
+`file://` URLs aren't behind Cloudflare, so the local-file path
+always works.
+
+**"Couldn't access the Claude Design preview URL" error.** The URL
+redirected to a sign-in flow instead of serving your design.
+Preview URL tokens expire after a few hours; either grab a fresh URL
+(in Claude Design, **Present → New tab** opens a new preview tab,
+copy that URL), or use the same standalone-HTML workaround as
+above.
+
 **Animation came out as a PNG instead of an MP4.** capture.js
 auto-detects animation vs static design by checking whether
 `window.__capture` is exposed. For animations from Claude Design

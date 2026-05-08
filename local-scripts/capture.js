@@ -101,9 +101,30 @@ async function main() {
   try {
     const page = await browser.newPage();
     page.on('pageerror', (err) => console.error('[page]', err.message));
+    // Console handler also flags auth-failure messages so we can bail
+    // with a useful error if the URL redirected to (or returned) an
+    // auth/login page instead of the actual design.
+    let authFailed = false;
+    const AUTH_FAIL_PATTERNS = /not signed in|identity provider|unauthorized|authentication required/i;
     page.on('console', (msg) => {
       const t = msg.type();
-      if (t === 'error' || t === 'warning') console.error(`[page:${t}]`, msg.text());
+      const text = msg.text();
+      if (AUTH_FAIL_PATTERNS.test(text)) authFailed = true;
+      if (t === 'error' || t === 'warning') console.error(`[page:${t}]`, text);
+    });
+
+    // Look less like headless Chrome to Cloudflare and similar bot
+    // detectors. The default Puppeteer UA contains "HeadlessChrome"
+    // (the single most reliable bot signal); we rewrite it to plain
+    // "Chrome" using Puppeteer's actual bundled version, so the
+    // string stays in sync as Puppeteer updates. We also override
+    // navigator.webdriver, another common tell. Not foolproof — if a
+    // CF challenge still trips, the explicit detection below catches
+    // it and falls back to a useful error message.
+    const realisticUA = (await browser.userAgent()).replace('HeadlessChrome', 'Chrome');
+    await page.setUserAgent(realisticUA);
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
     });
 
     let url;
@@ -178,6 +199,73 @@ async function main() {
     }
 
     await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+
+    // Detect Cloudflare bot-detection gate. CF-protected preview URLs
+    // sometimes serve a "verify you are human" challenge page to fresh
+    // headless sessions instead of the actual design. Without this
+    // check capture.js would silently screenshot the challenge page
+    // as if it were the design — looks successful but isn't.
+    if (isUrl) {
+      const challenged = await page.evaluate(() => {
+        const title = document.title || '';
+        const text = (document.body && document.body.innerText) || '';
+        return (
+          /performing security verification|verify you are human|checking your browser|just a moment/i.test(text) ||
+          /just a moment|attention required|access denied/i.test(title) ||
+          !!document.querySelector('#cf-wrapper, #cf-challenge-stage, [class*="cf-challenge"]')
+        );
+      });
+      if (challenged) {
+        console.error('');
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('Cloudflare blocked the headless browser session.');
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('');
+        console.error('Claude Design preview URLs are sometimes gated behind');
+        console.error('a Cloudflare "verify you are human" challenge for');
+        console.error('fresh non-browser sessions. Your real browser can pass;');
+        console.error("this script's headless Chrome can't, so it just got");
+        console.error('served the verification page instead of your design.');
+        console.error('');
+        console.error('Workaround: in Claude Design, click Share → Export as');
+        console.error('standalone HTML, then drop that file into render.command');
+        console.error("(or pass to capture.js as --input). file:// URLs aren't");
+        console.error('behind Cloudflare so this path always works.');
+        console.error('');
+        process.exit(1);
+      }
+
+      // Auth gate detection. Claude Design preview URLs expire / require
+      // a signed-in session; if the token's stale or the script's
+      // session isn't authenticated, the page redirects to a sign-in
+      // flow and the console emits "Not signed in with the identity
+      // provider" (or similar). authFailed is set by the console
+      // handler above. Final URL also checked as a fallback signal.
+      const finalUrl = page.url();
+      const looksLikeAuthPage =
+        authFailed ||
+        /\/(login|sign[-_]?in|auth(?:enticate)?)/i.test(finalUrl);
+      if (looksLikeAuthPage) {
+        console.error('');
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error("Couldn't access the Claude Design preview URL.");
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('');
+        console.error('The URL redirected to a sign-in flow instead of serving');
+        console.error('your design. The auth token in the URL is probably');
+        console.error('expired (these expire after a few hours) or the URL');
+        console.error("requires a signed-in session that this script's");
+        console.error("headless browser doesn't have.");
+        console.error('');
+        console.error('Workaround: in Claude Design, click Share → Export as');
+        console.error('standalone HTML, then drop that file into render.command');
+        console.error("(or pass to capture.js as --input). file:// URLs don't");
+        console.error("require auth so this path always works. Or grab a fresh");
+        console.error('preview URL via Present → New tab and try again.');
+        console.error('');
+        process.exit(1);
+      }
+    }
 
     // Auto-detect: animation pages expose window.__capture via the Stage
     // runtime; static design pages don't. Wait briefly to give the runtime

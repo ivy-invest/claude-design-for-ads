@@ -108,19 +108,30 @@ else
   cd "$INSTALL_DIR"
 fi
 
-# 4. npm install
+# 4. Strip macOS quarantine attribute from .command files. In theory
+# files downloaded via curl/git in Terminal aren't quarantined, but
+# recent macOS releases (Sequoia and later) have been more aggressive
+# about applying quarantine in unexpected places — without this,
+# users can hit a "could not verify ... is free of malware" Gatekeeper
+# dialog when they double-click render.command. Stripping is a no-op
+# if the attribute isn't present, so it's safe to run unconditionally.
+if command -v xattr >/dev/null 2>&1; then
+  xattr -dr com.apple.quarantine "$INSTALL_DIR" 2>/dev/null || true
+fi
+
+# 5. npm install
 echo ""
 echo "→ Installing the render script's dependencies (Puppeteer)..."
 npm install
 
-# 5. Render the example
+# 6. Render the example
 echo ""
 echo "→ Rendering example.mp4 as a verification step (~30 seconds)..."
 node local-scripts/capture.js \
   --input=examples/hello-world.html \
   --output=example.mp4
 
-# 6. Open it
+# 7. Open it
 echo ""
 echo "→ Opening example.mp4..."
 open example.mp4

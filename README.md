@@ -210,6 +210,20 @@ Reels), use `--width=1080 --height=1920`. The animation has to be
 authored at that aspect ratio though; you can't reflow a 1:1 animation
 to 9:16 by changing flags.
 
+**macOS says "render.command could not be verified" and won't open.**
+Recent macOS releases (Sequoia and later) sometimes apply Gatekeeper's
+quarantine attribute to files even when downloaded via curl, which
+isn't supposed to happen but does. Fresh installs since the fix don't
+hit this; if you installed before then, recover by running:
+
+```bash
+xattr -dr com.apple.quarantine ~/claude-design-for-ads/
+```
+
+Then double-click `render.command` again. (Replace
+`~/claude-design-for-ads/` with the path you installed to if you
+chose a custom location.)
+
 **Is this an Anthropic project?**
 No — we independently developed this at
 [Ivy Invest](https://ivyinvest.co) as part of our efforts to generate

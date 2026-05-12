@@ -14,10 +14,11 @@ https://github.com/user-attachments/assets/ae9b17e6-955e-4e55-8a7e-1e56d595bc87
 The flow:
 
 1. Make an animation or static design in Claude Design.
-2. Click **Present** → **New tab** to open the preview, copy that
-   tab's URL.
-3. Paste the URL into the toolkit's local render script. Animations
-   come back as MP4, static designs as high-resolution PNG.
+2. Click **Share** → **Export as standalone HTML** to download a
+   self-contained file.
+3. Drag that HTML file into the toolkit's local render script.
+   Animations come back as MP4, static designs as high-resolution
+   PNG.
 
 **Why this instead of screen-recording the animation or just asking
 Claude Design to export an image?**
@@ -112,24 +113,15 @@ pipeline — the script auto-detects which one you've handed it.
    filling in the blanks. Then paste the completed brief into
    Claude Design.
 
-3. **Get the design off Claude Design.** Two ways:
-
-   - **Copy the preview URL.** In Claude Design, click **Present**
-     in the upper right and choose **New tab** from the dropdown —
-     the design opens in a fresh browser tab. Copy that tab's URL
-     (looks like
-     `https://...claudeusercontent.com/.../My Design.html?t=...`).
-     Fastest path. The token in the URL expires after a few hours,
-     so render reasonably soon after copying.
-   - **Or save as standalone HTML.** Click **Share** in the upper
-     right and choose **Export as standalone HTML**. Gives you a
-     self-contained file you can archive, share, or render later
-     without depending on a session token.
+3. **Save as standalone HTML.** Click **Share** in the upper right
+   of the Claude Design window and choose **Export as standalone
+   HTML**. You'll get a self-contained file with everything inlined
+   — runs anywhere, doesn't depend on Claude Design being reachable.
 
 4. **Render it.** On Mac, open the toolkit folder
    (`~/claude-design-for-ads`) in Finder and double-click
    `render.command`. A Terminal window opens and prompts you to
-   paste the URL or drag the HTML file in. Press Enter.
+   drag the HTML file in. Press Enter.
 
    - For **animations**, the script substitutes a contract-compliant
      Stage runtime in flight, captures every frame deterministically
@@ -139,8 +131,8 @@ pipeline — the script auto-detects which one you've handed it.
      element via a structural heuristic, waits for fonts to apply,
      and screenshots the element at 2× DPR → PNG. Seconds.
 
-   The output lands next to your HTML (or in the toolkit folder for
-   URLs) and opens automatically when done.
+   The output lands next to your HTML and opens automatically when
+   done.
 
    On Linux/Windows or if you want control over output settings (size,
    frame rate, etc.), run the capture script directly from Terminal:
@@ -160,13 +152,13 @@ pipeline — the script auto-detects which one you've handed it.
 ## Common questions
 
 **Do I have to use Claude Design?**
-The toolkit is built around Claude Design's preview URL conventions
-and the `<Stage>` API its default animation runtime exposes, but the
-core ideas — runtime substitution at capture time, element-targeted
-PNG capture at 2× DPR — work with any tool that produces standalone
-HTML in a similar shape. The render script works on any HTML that
-exposes a `window.__capture`-compatible API for animations, or any
-static design page for images.
+The toolkit is built around Claude Design's standalone-HTML export
+format and the `<Stage>` API its default animation runtime exposes,
+but the core ideas — runtime substitution at capture time,
+element-targeted PNG capture at 2× DPR — work with any tool that
+produces standalone HTML in a similar shape. The render script works
+on any HTML that exposes a `window.__capture`-compatible API for
+animations, or any static design page for images.
 
 **Do I need anything installed in my Claude Design Design System?**
 No. Earlier versions of this toolkit installed an image-export
@@ -194,15 +186,23 @@ frames) and how complex the animation is. You can speed it up by
 dropping `--fps=30` (cuts to 1500 frames) or `--scale=1` (no
 2× supersampling — slightly softer text but ~3× faster).
 
+**The "Export as standalone HTML" download button does nothing.**
+Claude Design's session sometimes goes stale — the agent will tell
+you it's generated the file, but clicking the download button
+silently fails and no file lands. Tell Claude Design: *"the download
+button isn't working. Regenerate from scratch and give me a new
+download."* That usually clears whatever stale state was holding the
+file back.
+
 **My animation came out as a PNG instead of an MP4.**
 capture.js auto-detects animation vs static design by waiting briefly
-for `window.__capture` to appear. For Claude Design preview URLs the
-script substitutes a contract-compliant Stage runtime in flight, so
-animations capture cleanly even if the source uses Claude Design's
-default Stage. If you're rendering a downloaded standalone HTML and
-it falls through to the static path, the export is probably missing
-the `<Stage>` component or its expected child structure — re-export
-from Claude Design and try again.
+for `window.__capture` to appear. capture.js intercepts requests for
+the default `animations.jsx` runtime and substitutes a contract-
+compliant Stage in flight, so animations capture cleanly even if the
+source uses Claude Design's default Stage. If your standalone HTML
+falls through to the static path, the export is probably missing the
+`<Stage>` component or its expected child structure — re-export from
+Claude Design and try again.
 
 **Can I render at a different size or aspect ratio?**
 Yes — `--width` and `--height` flags. For a 9:16 vertical (TikTok,
@@ -223,6 +223,17 @@ xattr -dr com.apple.quarantine ~/claude-design-for-ads/
 Then double-click `render.command` again. (Replace
 `~/claude-design-for-ads/` with the path you installed to if you
 chose a custom location.)
+
+If that doesn't work or you'd rather not bother, just run
+`./render.command` directly from Terminal:
+
+```bash
+cd ~/claude-design-for-ads
+./render.command
+```
+
+Gatekeeper only runs when Finder/LaunchServices launches a file —
+invoking it via Terminal sidesteps the check entirely.
 
 **Is this an Anthropic project?**
 No — we independently developed this at
@@ -256,10 +267,10 @@ examples/
 The pieces, by what they do:
 
 - **`local-scripts/`** is the toolkit's only moving part — capture.js
-  + video-stage.jsx + supporting README. capture.js takes a Claude
-  Design preview URL or a downloaded standalone HTML, auto-detects
-  whether it's an animation or a static design, and produces the
-  right output (MP4 or PNG).
+  + video-stage.jsx + supporting README. capture.js takes a
+  standalone HTML file (the kind Claude Design's Share → Export as
+  standalone HTML produces), auto-detects whether it's an animation
+  or a static design, and produces the right output (MP4 or PNG).
 - **`reference/`** are design guides — read them on GitHub, or drag
   them into a Claude.ai chat when drafting a brief. They aren't
   installed anywhere; they shape *how you brief* a design.

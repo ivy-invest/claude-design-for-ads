@@ -143,13 +143,13 @@ cat <<DONE
 
   The toolkit lives at: $INSTALL_DIR
 
-  To render your own animations later:
-  - Open that folder in Finder, double-click render.command, then
-    paste a Claude Design preview URL (or drag in an HTML file)
-    into the Terminal window and press Enter.
+  To render your own designs later:
+  - In Claude Design, click Share → Export as standalone HTML to
+    download the file.
+  - Open the toolkit folder in Finder, double-click render.command,
+    drag your downloaded HTML into the Terminal window, press Enter.
   - Or from Terminal:
-      $INSTALL_DIR/render.command "https://...claudeusercontent.com/..."
-      $INSTALL_DIR/render.command path/to/animation.html
+      $INSTALL_DIR/render.command path/to/design.html
 
 ================================================================
 

@@ -8,11 +8,12 @@ frame-by-frame and encodes to MP4; otherwise it screenshots the
 design's wrapper element at 2× DPR and produces a PNG.
 
 `video-stage.jsx` is the toolkit's contract-compliant Stage runtime.
-For Claude Design preview URLs whose source animations were
-authored against the default Stage, capture.js intercepts the
-`animations.jsx` request and substitutes `video-stage.jsx` in
-flight, so deterministic frame capture works without anything
-installed on the Claude Design side.
+When the input HTML references the default `animations.jsx` runtime,
+capture.js intercepts that request and substitutes `video-stage.jsx`
+in flight, so deterministic frame capture works regardless of which
+Stage the source was authored against. (Most users won't notice this
+machinery — Claude Design's standalone-HTML exports already inline a
+compatible runtime.)
 
 It uses two well-known tools under the hood:
 
@@ -38,10 +39,13 @@ node local-scripts/capture.js \
   --output=path/to/animation.mp4
 ```
 
-`--input` accepts either a local HTML file path or an http(s) URL.
-URLs are useful for capturing Claude Design preview links directly
-without exporting the standalone HTML first — see "Capturing from a
-Claude Design preview URL" below for the details.
+`--input` is normally a local HTML file you got via Claude Design's
+**Share → Export as standalone HTML**. http(s) URLs are also accepted
+but rarely work for Claude Design these days — Anthropic now requires
+auth on Present-mode preview URLs, so a fresh headless session can't
+pass the gate. URL capture remains in capture.js for non-Claude-Design
+hosts that serve unauthenticated standalone HTML; see "Capturing from
+a URL (advanced)" below.
 
 Defaults: 1080×1080 square video at 60fps, with text rendered at 2×
 the output size and shrunk down for crispness. Output quality is
@@ -75,42 +79,37 @@ take noticeably longer than 1080p (each frame screenshot is 4× larger).
 
 ---
 
-## Capturing from a Claude Design preview URL
+## Capturing from a URL (advanced)
 
-Pass the preview URL directly to `--input`:
+`--input` accepts http(s) URLs as well as local file paths. For most
+Claude Design users this isn't a useful path anymore — Anthropic
+requires auth on Present-mode preview URLs, so capture.js's headless
+session can't reach the actual content (it gets a sign-in page or
+Cloudflare challenge instead). The script detects both failure modes
+and exits with a clear "use Share → Export as standalone HTML
+instead" message.
+
+The URL path is still useful for:
+
+- Non-Claude-Design hosts that serve standalone HTML without auth
+  (your own dev server, an internal CDN, etc.).
+- Claude Design URLs in the rare case they ever become publicly
+  accessible without auth in the future.
+
+When given a URL, capture.js intercepts requests for the default
+`animations.jsx` Stage runtime in the Puppeteer session and
+substitutes our contract-compliant `video-stage.jsx` in flight, so
+the page exposes `window.__capture`, supports `?embed=1`, and stops
+cleanly at `t=duration` regardless of what the source originally
+shipped with. Other relative `.jsx` scripts on the same origin get
+re-fetched with the original URL's auth token (if present) and
+served via the same interception.
 
 ```bash
 node local-scripts/capture.js \
-  --input="https://...claudeusercontent.com/.../How%20Gravity%20Works.html?t=..." \
-  --output=gravity.mp4
+  --input="https://your-host.example.com/My%20Animation.html" \
+  --output=animation.mp4
 ```
-
-This works even if the source animation was authored without the
-toolkit installed in its Design System — i.e., it uses Claude Design's
-default `animations.jsx` Stage runtime instead of our
-`video-stage.jsx`. capture.js intercepts requests for `animations.jsx`
-in the Puppeteer session and substitutes our contract-compliant
-runtime in flight, so the page exposes `window.__capture`, supports
-`?embed=1`, and stops cleanly at `t=duration` regardless of what the
-source originally shipped with.
-
-Other relative `.jsx` scripts on the same origin (typically
-`scenes.jsx`) get re-fetched with the original URL's auth token and
-served via the same interception — sidestepping the CDN auth
-behavior that would otherwise 401 the unauthenticated relative
-requests.
-
-Caveats:
-
-- The token in the preview URL (`?t=...`) is session-scoped. If the
-  token expires before the render finishes, the capture fails. Grab a
-  fresh URL from Claude Design and try again.
-- Only works for animations using the same `<Stage>` API surface as
-  `video-stage.jsx` (component name, prop names like `width`,
-  `height`, `duration`, `background`, `persistKey`, child shape via
-  `<Sprite start end>`). Most Claude Design animations follow this
-  pattern, but a heavily customized one with renamed components or
-  different hooks won't work.
 
 ---
 
@@ -166,12 +165,11 @@ Design, click **Share → Export as standalone HTML**, then drag
 `file://` URLs aren't behind Cloudflare, so the local-file path
 always works.
 
-**"Couldn't access the Claude Design preview URL" error.** The URL
-redirected to a sign-in flow instead of serving your design.
-Preview URL tokens expire after a few hours; either grab a fresh URL
-(in Claude Design, **Present → New tab** opens a new preview tab,
-copy that URL), or use the same standalone-HTML workaround as
-above.
+**"Couldn't access the Claude Design preview URL" error.** Anthropic
+requires auth on Present-mode preview URLs, so capture.js's headless
+session gets redirected to sign-in instead of the actual design.
+Workaround: same as above — in Claude Design, click **Share → Export
+as standalone HTML** and render the downloaded file instead.
 
 **Animation came out as a PNG instead of an MP4.** capture.js
 auto-detects animation vs static design by checking whether

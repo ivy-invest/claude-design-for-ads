@@ -1,25 +1,19 @@
 #!/usr/bin/env bash
 #
-# claude-design-for-ads — render a Claude Design preview into MP4 or PNG
+# claude-design-for-ads — render a Claude Design HTML into MP4 or PNG
 #
 # Workflow:
-#   1. Double-click render.command in Finder (opens Terminal)
-#   2. Drag an animation HTML / static design HTML into the Terminal
-#      window, or paste a Claude Design preview URL
-#   3. Press Enter
+#   1. In Claude Design, click Share → Export as standalone HTML
+#   2. Double-click render.command in Finder (opens Terminal)
+#   3. Drag the downloaded HTML file into the Terminal window
+#   4. Press Enter
 #
 # capture.js auto-detects animation vs static design:
 #   - Animation (window.__capture exposed) → MP4
 #   - Static design (no capture API) → PNG at 2× DPR
 #
-# Claude Design preview URLs (https://...claudeusercontent.com/...)
-# work directly. For animation URLs, capture.js intercepts the default
-# Stage runtime and substitutes a contract-compliant video-stage.jsx
-# in flight, so no Design System install is required.
-#
-# Or run from Terminal with the file/URL as an arg:
+# Or run from Terminal with the file as an arg:
 #   ./render.command path/to/design.html
-#   ./render.command "https://...claudeusercontent.com/.../My%20Design.html?t=..."
 #
 # Mac only. For Linux/Windows, run the capture script directly:
 #   node local-scripts/capture.js --input=... --output=...
@@ -71,10 +65,12 @@ if [ -z "$INPUT" ]; then
 ================================================================
   claude-design-for-ads — render
 
-  Paste a Claude Design preview URL into this Terminal window, OR
-  drag in a Claude Design HTML file (animation or static design).
-  Then press Enter. Animations render to MP4; static designs render
-  to PNG at 2× DPR.
+  Drag a Claude Design HTML file (animation or static design) into
+  this Terminal window, then press Enter. Animations render to MP4;
+  static designs render to PNG at 2× DPR.
+
+  Don't have the HTML yet? In Claude Design, click Share → Export
+  as standalone HTML.
 ================================================================
 
 PROMPT

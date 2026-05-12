@@ -289,18 +289,32 @@ async function main() {
       const pngOutput = output.replace(/\.(mp4|png|jpg|jpeg)$/i, '') + '.png';
 
       // Structural heuristic: walk body's children, take the largest
-      // non-structural one. If it fills body (95%+ width/height) it's
-      // another wrapper, so drill into ITS largest child. Stop when
-      // the candidate is smaller than body — that's the design. Works
-      // regardless of wrapper tag/class. Sets data-cda-target on the
+      // non-structural one. If it fills body AND has just one substantive
+      // child, it's a wrapper — drill into that child. Stop as soon as
+      // the candidate has multiple substantive children: at that point
+      // it's a layout container holding the actual design (header + body
+      // + footer, multiple columns, etc.), not another wrapper. Without
+      // the multi-child stop, a design that itself fills the viewport
+      // (common for fixed-size posters/ads) gets mistaken for a wrapper
+      // and we end up capturing just its largest child — clipping
+      // headers, titles, footers, etc. Sets data-cda-target on the
       // chosen element so we can grab a fresh handle after reloads.
       const findDesign = async () => {
         return await page.evaluate(() => {
           const STRUCTURAL = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK', 'META']);
-          const largestChild = (parent) => {
-            let best = null, bestArea = 0;
+          const substantiveChildren = (parent) => {
+            const out = [];
             for (const c of parent.children) {
               if (STRUCTURAL.has(c.tagName)) continue;
+              const r = c.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) continue;
+              out.push(c);
+            }
+            return out;
+          };
+          const largestOf = (kids) => {
+            let best = null, bestArea = 0;
+            for (const c of kids) {
               const r = c.getBoundingClientRect();
               const area = r.width * r.height;
               if (area > bestArea) { best = c; bestArea = area; }
@@ -308,15 +322,17 @@ async function main() {
             return best;
           };
           const bodyRect = document.body.getBoundingClientRect();
-          let el = largestChild(document.body);
+          let el = largestOf(substantiveChildren(document.body));
           if (!el) return null;
           for (let i = 0; i < 5; i++) {
             const r = el.getBoundingClientRect();
             const fillsBody = r.width >= bodyRect.width * 0.95 && r.height >= bodyRect.height * 0.95;
             if (!fillsBody) break;
-            const inner = largestChild(el);
-            if (!inner || inner === el) break;
-            el = inner;
+            const kids = substantiveChildren(el);
+            // Multiple substantive children → this is layout, not a wrapper.
+            if (kids.length !== 1) break;
+            if (kids[0] === el) break;
+            el = kids[0];
           }
           el.setAttribute('data-cda-target', '');
           const r = el.getBoundingClientRect();
